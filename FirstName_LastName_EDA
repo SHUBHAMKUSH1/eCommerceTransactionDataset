@@ -1,0 +1,123 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import davies_bouldin_score
+from sklearn.cluster import KMeans
+import warnings
+warnings.filterwarnings('ignore')
+
+def load_data():
+    """
+    Load the three CSV files and perform initial data cleaning
+    """
+    # Load datasets
+    customers_df = pd.read_csv('Customers.csv')
+    products_df = pd.read_csv('Products.csv')
+    transactions_df = pd.read_csv('Transactions.csv')
+    
+    # Convert date columns to datetime
+    customers_df['SignupDate'] = pd.to_datetime(customers_df['SignupDate'])
+    transactions_df['TransactionDate'] = pd.to_datetime(transactions_df['TransactionDate'])
+    
+    return customers_df, products_df, transactions_df
+
+def perform_basic_eda(customers_df, products_df, transactions_df):
+    """
+    Perform basic exploratory data analysis
+    """
+    print("Basic Dataset Information:")
+    print("\nCustomers Dataset:")
+    print(f"Number of customers: {len(customers_df)}")
+    print("\nCustomer distribution by region:")
+    print(customers_df['Region'].value_counts())
+    
+    print("\nProducts Dataset:")
+    print(f"Number of products: {len(products_df)}")
+    print("\nProduct distribution by category:")
+    print(products_df['Category'].value_counts())
+    
+    print("\nTransactions Dataset:")
+    print(f"Number of transactions: {len(transactions_df)}")
+    print(f"Total revenue: ${transactions_df['TotalValue'].sum():,.2f}")
+    
+    # Calculate key metrics
+    avg_transaction_value = transactions_df['TotalValue'].mean()
+    transactions_per_customer = transactions_df.groupby('CustomerID').size().mean()
+    
+    print(f"\nAverage transaction value: ${avg_transaction_value:.2f}")
+    print(f"Average transactions per customer: {transactions_per_customer:.2f}")
+
+def analyze_customer_behavior(customers_df, transactions_df):
+    """
+    Analyze customer purchasing behavior
+    """
+    # Merge transactions with customer data
+    customer_transactions = pd.merge(
+        transactions_df, 
+        customers_df[['CustomerID', 'Region']], 
+        on='CustomerID'
+    )
+    
+    # Calculate metrics by region
+    regional_metrics = customer_transactions.groupby('Region').agg({
+        'TotalValue': ['sum', 'mean', 'count'],
+        'CustomerID': 'nunique'
+    }).round(2)
+    
+    regional_metrics.columns = ['Total Revenue', 'Avg Transaction Value', 'Number of Transactions', 'Number of Customers']
+    print("\nRegional Performance Metrics:")
+    print(regional_metrics)
+    
+    return regional_metrics
+
+def visualize_trends(transactions_df, products_df):
+    """
+    Create visualizations for key trends
+    """
+    # Merge transactions with product data
+    transaction_products = pd.merge(
+        transactions_df,
+        products_df[['ProductID', 'Category']],
+        on='ProductID'
+    )
+    
+    # Plot monthly sales trend
+    plt.figure(figsize=(12, 6))
+    monthly_sales = transaction_products.set_index('TransactionDate')['TotalValue'].resample('M').sum()
+    plt.plot(monthly_sales.index, monthly_sales.values)
+    plt.title('Monthly Sales Trend')
+    plt.xlabel('Date')
+    plt.ylabel('Total Sales ($)')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+    
+    # Plot category performance
+    plt.figure(figsize=(10, 6))
+    category_sales = transaction_products.groupby('Category')['TotalValue'].sum().sort_values(ascending=True)
+    category_sales.plot(kind='barh')
+    plt.title('Sales by Product Category')
+    plt.xlabel('Total Sales ($)')
+    plt.tight_layout()
+    plt.show()
+
+def main():
+    # Load data
+    customers_df, products_df, transactions_df = load_data()
+    
+    # Perform EDA
+    perform_basic_eda(customers_df, products_df, transactions_df)
+    
+    # Analyze customer behavior
+    regional_metrics = analyze_customer_behavior(customers_df, transactions_df)
+    
+    # Create visualizations
+    visualize_trends(transactions_df, products_df)
+    
+    return customers_df, products_df, transactions_df, regional_metrics
+
+if _name_ == "_main_":
+    customers_df, products_df, transactions_df, regional_metrics = main()
